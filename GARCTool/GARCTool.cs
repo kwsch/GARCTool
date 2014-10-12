@@ -52,6 +52,8 @@ namespace GARCTool // If you are including this source file, replace the namespa
             }
             catch (Exception e)
             {
+                if (pBar1.IsDisposed)
+                    return false;
                 MessageBox.Show("Error!\n\n" + e.ToString());
                 System.Media.SystemSounds.Exclamation.Play();
                 return false;
@@ -259,8 +261,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             compressed = true;
                         else
                         {
-                            byte[] guessExtension = System.Text.Encoding.ASCII.GetBytes(br.ReadChars(4));
-                            ext = Util.GuessExtension(guessExtension, "bin");
+                            ext = Util.GuessExtension(br, "bin");
                             br.BaseStream.Seek(0, SeekOrigin.Begin);
                         }
                     }
@@ -288,6 +289,14 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             long n = dsdecmp.Decompress(fileout,decout);
                             try { File.Delete(fileout); }
                             catch { MessageBox.Show("A compressed file could not be deleted for some reason"); }
+
+                            // Try to detect for extension now
+                            using (BinaryReader dr = new BinaryReader(System.IO.File.OpenRead(decout)))
+                            {
+                                ext = Util.GuessExtension(dr, "bin");
+                            }
+
+                            File.Move(decout, Path.Combine(outPath, "dec_" + filename + "." + ext));
                         }
                         catch
                         {
@@ -336,19 +345,42 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
             return input.Substring(0, index);
         }
-        public static string GuessExtension(byte[] magic, string defaultExt)
+        public static string GuessExtension(BinaryReader br, string defaultExt)
         {
             string ext = "";
-            for (int i = 0; i < magic.Length && i < 4; i++)
+            long position = br.BaseStream.Position;
+            byte[] magic = System.Text.Encoding.ASCII.GetBytes(br.ReadChars(4));
+            if (magic[0] < 0x41) return defaultExt;
+
+            // check for extensions
             {
-                if ((magic[i] >= 'a' && magic[i] <= 'z') || (magic[i] >= 'A' && magic[i] <= 'Z')
-                    || char.IsDigit((char)magic[i]))
+                // check for 2char container extensions
+                ushort count = BitConverter.ToUInt16(magic, 2);
+                br.BaseStream.Position = 4 + 4 * count;
+                if (br.ReadUInt32() == br.BaseStream.Length)
                 {
-                    ext += (char)magic[i];
+                    ext += (char)magic[0];
+                    ext += (char)magic[1];
                 }
+
+                // else Assume Generic 
                 else
-                    break;
+                {
+                    for (int i = 0; i < magic.Length && i < 4; i++)
+                    {
+                        if ((magic[i] >= 'a' && magic[i] <= 'z') || (magic[i] >= 'A' && magic[i] <= 'Z')
+                            || char.IsDigit((char)magic[i]))
+                        {
+                            ext += (char)magic[i];
+                        }
+                        else
+                            break;
+                    }
+                }
             }
+            // Return BaseStream position to the start.
+            br.BaseStream.Position = position;
+
             if (ext.Length <= 1)
                 return defaultExt;
             return ext;
