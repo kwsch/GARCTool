@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace GARCTool
 {
@@ -38,6 +39,12 @@ namespace GARCTool
         {
             if (TB_Path.Text.Length == 0)
             { MessageBox.Show("No Path Loaded"); return; }
+            Thread thread = new Thread(new ThreadStart(mainThread)); 
+            thread.Start();
+        }
+
+        private void mainThread()
+        {
             GARCTool.garcOmni(TB_Path.Text, progressBar);
         }
     }

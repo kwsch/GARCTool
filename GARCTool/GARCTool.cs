@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace GARCTool // If you are including this source file, replace the namespace with the name of your program.
 {
@@ -51,7 +52,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
             }
             catch (Exception e)
             {
-                MessageBox.Show("Error!\n\n" + e);
+                MessageBox.Show("Error!\n\n" + e.ToString());
                 System.Media.SystemSounds.Exclamation.Play();
                 return false;
             }
@@ -74,7 +75,13 @@ namespace GARCTool // If you are including this source file, replace the namespa
             string[] filepaths = Directory.GetFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly);
 
             // Initialize ProgressBar
-            if (pBar1 == null) pBar1 = new ProgressBar(); pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length;
+            if (pBar1 == null) pBar1 = new ProgressBar();
+            if (pBar1.InvokeRequired)
+                pBar1.Invoke((MethodInvoker)delegate { 
+                pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length; 
+                });
+            else
+                pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length;
 
             // Copy the files to the working directory so our compression doesn't overwrite anything.
             for (int i = 0; i < filepaths.Length; i++)
@@ -155,7 +162,10 @@ namespace GARCTool // If you are including this source file, replace the namespa
                         fileStream.CopyTo(GARCdata);    // then pad with FF's if not /4
                         while (GARCdata.Length % 4 > 0) GARCdata.WriteByte(0xFF);
                     }
-                    pBar1.PerformStep();
+                    if (pBar1.InvokeRequired)
+                        pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
+                    else
+                        pBar1.PerformStep();
                 }
                 // Roundup Offset
 
@@ -189,6 +199,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                     Directory.Delete(buildPath, true);
 
                     // We're done.
+                    System.Media.SystemSounds.Exclamation.Play();
                     MessageBox.Show("Pack Successful!\n\n" + filepaths.Length + " files packed to the GARC!");
                     return true;
                 }
@@ -216,7 +227,14 @@ namespace GARCTool // If you are including this source file, replace the namespa
             FileInfo fileInfo = new FileInfo(garcPath);
 
             // Initialize ProgressBar
-            if (pBar1 == null) pBar1 = new ProgressBar(); pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles;
+            if (pBar1 == null) pBar1 = new ProgressBar();
+
+            if (pBar1.InvokeRequired)
+                pBar1.Invoke((MethodInvoker)delegate 
+                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
+                );
+            else
+                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
 
             using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(garcPath)))
             {
@@ -278,10 +296,14 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             catch { MessageBox.Show("This shouldn't happen"); }
                         }
                     }
-                    pBar1.PerformStep();
+                    if (pBar1.InvokeRequired)
+                        pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
+                    else
+                        pBar1.PerformStep();
                     #endregion
                 }
             }
+            System.Media.SystemSounds.Exclamation.Play();
             MessageBox.Show("Unpack Successful!\n\n" + garc.otaf.nFiles + " files unpacked from the GARC!");
             return true;
         }
