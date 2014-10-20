@@ -224,10 +224,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
             // Unpack the GARC
             GARC garc = ARC.unpackGARC(garcPath);
-
-            // Get file path infos for exporting
-            FileInfo fileInfo = new FileInfo(garcPath);
-
+            
             // Initialize ProgressBar
             if (pBar1 == null) pBar1 = new ProgressBar();
 
@@ -247,15 +244,20 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 }
             
                 // Pull out all the files
-                for (int i = 0; i < garc.otaf.nFiles; i++)
+                for (int o = 0; o < garc.otaf.nFiles; o++)
                 {
-                    string ext = "bin";
-                    bool compressed = false;
-
-                    br.BaseStream.Position = garc.btaf.entries[i].start_offset + garc.data_offset;
-                    try
+                    for (int i = 0; i < garc.btaf.nFiles; i++)
                     {
-                        byte lzss = (byte)br.PeekChar();
+                        string ext = "bin";
+                        bool compressed = false;
+
+                        br.BaseStream.Position = garc.btaf.entries[i].start_offset + garc.data_offset;
+                        byte lzss;
+                        try
+                        {
+                            lzss = (byte)br.PeekChar();
+                        }
+                        catch { lzss = 0; }
 
                         if (lzss == 0x11)
                             compressed = true;
@@ -264,52 +266,54 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             ext = Util.GuessExtension(br, "bin");
                             br.BaseStream.Seek(0, SeekOrigin.Begin);
                         }
-                    }
-                    catch { ext = null; }
 
-                    // Set File Name
-                    string filename = i.ToString("D" + Math.Ceiling(Math.Log10(garc.otaf.nFiles)));
-                    string fileout = Path.Combine(outPath,filename + "." + ext);
-                    using (BinaryWriter bw = new BinaryWriter(File.OpenWrite(fileout)))
-                    {
-                        // Write out the data for the file
-                        br.BaseStream.Position = garc.btaf.entries[i].start_offset + garc.data_offset;
-                        for (int x = 0; x < garc.btaf.entries[i].length; x++)
+                        // Set File Name
+                        string filename = o.ToString("D" + Math.Ceiling(Math.Log10(garc.otaf.nFiles)));
+                        if (garc.btaf.nFiles == garc.otaf.nFiles) filename = i.ToString("D" + Math.Ceiling(Math.Log10(garc.otaf.nFiles)));
+                        else if (garc.btaf.nFiles > 1 && garc.btaf.nFiles != garc.otaf.nFiles) filename += "." + i;
+                        string fileout = Path.Combine(outPath, filename + "." + ext);
+                        using (BinaryWriter bw = new BinaryWriter(File.OpenWrite(fileout)))
                         {
-                            bw.Write(br.ReadByte());
-                        }
-                    }
-                    // See if decompression should be attempted.
-                    #region Decompression
-                    if (compressed && !skipDecompression)
-                    {
-                        string decout = Path.Combine(outPath,"dec_" + filename + ".bin");
-                        try
-                        {
-                            long n = dsdecmp.Decompress(fileout,decout);
-                            try { File.Delete(fileout); }
-                            catch { MessageBox.Show("A compressed file could not be deleted for some reason"); }
-
-                            // Try to detect for extension now
-                            using (BinaryReader dr = new BinaryReader(System.IO.File.OpenRead(decout)))
+                            // Write out the data for the file
+                            br.BaseStream.Position = garc.btaf.entries[i].start_offset + garc.data_offset;
+                            for (int x = 0; x < garc.btaf.entries[i].length; x++)
                             {
-                                ext = Util.GuessExtension(dr, "bin");
+                                bw.Write(br.ReadByte());
                             }
-
-                            File.Move(decout, Path.Combine(outPath, "dec_" + filename + "." + ext));
                         }
-                        catch
+                        // See if decompression should be attempted.
+                        #region Decompression
+                        if (compressed && !skipDecompression)
                         {
-                            // File is really not encrypted.
-                            try { File.Delete(decout); }
-                            catch { MessageBox.Show("This shouldn't happen"); }
+                            string decout = Path.Combine(outPath, "dec_" + filename + ".bin");
+                            try
+                            {
+                                long n = dsdecmp.Decompress(fileout, decout);
+                                try { File.Delete(fileout); }
+                                catch { MessageBox.Show("A compressed file could not be deleted for some reason"); }
+
+                                // Try to detect for extension now
+                                using (BinaryReader dr = new BinaryReader(System.IO.File.OpenRead(decout)))
+                                {
+                                    ext = Util.GuessExtension(dr, "bin");
+                                }
+
+                                File.Move(decout, Path.Combine(outPath, "dec_" + filename + "." + ext));
+                            }
+                            catch
+                            {
+                                // File is really not encrypted.
+                                try { File.Delete(decout); }
+                                catch { MessageBox.Show("This shouldn't happen"); }
+                            }
                         }
+                        if (pBar1.InvokeRequired)
+                            pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
+                        else
+                            pBar1.PerformStep();
+                        #endregion
                     }
-                    if (pBar1.InvokeRequired)
-                        pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
-                    else
-                        pBar1.PerformStep();
-                    #endregion
+                    if (garc.otaf.nFiles == garc.btaf.nFiles) break;
                 }
             }
             System.Media.SystemSounds.Exclamation.Play();
@@ -347,25 +351,50 @@ namespace GARCTool // If you are including this source file, replace the namespa
         }
         public static string GuessExtension(BinaryReader br, string defaultExt)
         {
-            string ext = "";
+            try { string ext = "";
             long position = br.BaseStream.Position;
             byte[] magic = System.Text.Encoding.ASCII.GetBytes(br.ReadChars(4));
-            if (magic[0] < 0x41) return defaultExt;
 
             // check for extensions
             {
-                // check for 2char container extensions
                 ushort count = BitConverter.ToUInt16(magic, 2);
-                br.BaseStream.Position = 4 + 4 * count;
-                if (br.ReadUInt32() == br.BaseStream.Length)
-                {
-                    ext += (char)magic[0];
-                    ext += (char)magic[1];
-                }
 
-                // else Assume Generic 
-                else
+                // check for 2char container extensions
+                try 
+                {   
+                    br.BaseStream.Position = 4 + 4 * count;
+                    if (br.ReadUInt32() == br.BaseStream.Length)
+                    {
+                        ext += (char)magic[0];
+                        ext += (char)magic[1];
+                        goto end;
+                    }
+                } catch { }
+
+                // check for darc
+                try
                 {
+                    count = BitConverter.ToUInt16(magic, 0);
+                    br.BaseStream.Position = 4 + 0x40 * count;
+                    uint tableval = br.ReadUInt32();
+                    br.BaseStream.Position += 0x20 * tableval;
+                    while (br.PeekChar() == 0) // seek forward
+                        br.ReadByte();
+                    if (br.ReadUInt32() == 0x63726164)
+                        return "darc";
+                } catch { };
+
+                // check for bclim
+                try
+                {
+                    br.BaseStream.Position = br.BaseStream.Length - 0x28;
+                    if (br.ReadUInt32() == 0x4D494C43)
+                        return "bclim";
+                } catch { }
+
+                // generic check
+                {
+                    if (magic[0] < 0x41) return defaultExt;
                     for (int i = 0; i < magic.Length && i < 4; i++)
                     {
                         if ((magic[i] >= 'a' && magic[i] <= 'z') || (magic[i] >= 'A' && magic[i] <= 'Z')
@@ -378,12 +407,15 @@ namespace GARCTool // If you are including this source file, replace the namespa
                     }
                 }
             }
-            // Return BaseStream position to the start.
-            br.BaseStream.Position = position;
-
-            if (ext.Length <= 1)
-                return defaultExt;
-            return ext;
+            end:
+            {
+                // Return BaseStream position to the start.
+                br.BaseStream.Position = position;
+                if (ext.Length <= 1)
+                    return defaultExt;
+                return ext;
+            }
+            } catch { return defaultExt;}
         }
     }
     #region GARC Class & Struct
@@ -431,9 +463,11 @@ namespace GARCTool // If you are including this source file, replace the namespa
             garc.btaf.nFiles = br.ReadUInt32();
 
             garc.btaf.entries = new BTAF_Entry[garc.btaf.nFiles];
+            garc.btaf.entries[0].bits = br.ReadUInt32();
             for (int i = 0; i < garc.btaf.nFiles; i++)
             {
-                garc.btaf.entries[i].bits = br.ReadUInt32();
+                if (i != 0 && garc.btaf.nFiles == garc.otaf.nFiles)
+                    garc.btaf.entries[i].bits = br.ReadUInt32();
                 garc.btaf.entries[i].start_offset = br.ReadUInt32();
                 garc.btaf.entries[i].end_offset = br.ReadUInt32();
                 garc.btaf.entries[i].length = br.ReadUInt32();
