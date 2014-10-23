@@ -45,7 +45,7 @@ namespace GARCTool
 
         private void mainThread()
         {
-            GARCTool.garcOmni(TB_Path.Text, progressBar);
+            GARCTool.garcOmni(TB_Path.Text, ModifierKeys == Keys.Control, progressBar, label1);
         }
     }
 }

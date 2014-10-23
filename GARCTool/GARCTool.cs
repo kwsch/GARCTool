@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows.Forms;
 using System.Threading;
+using System.Collections.Generic;
 
 namespace GARCTool // If you are including this source file, replace the namespace with the name of your program.
 {
@@ -35,16 +36,87 @@ namespace GARCTool // If you are including this source file, replace the namespa
     #region GARCTool Classes
     public class GARCTool
     {
-        public static bool garcOmni(string path, ProgressBar pBar1 = null)
+        public static bool garcOmni(string path, bool skipdecompression = false, ProgressBar pBar1 = null, Label label = null)
         {
+            try // Try decompressing the file.
+            {
+                if (new FileInfo(path).Length > 60 && Path.GetExtension(path) == ".bin" && Path.GetFileNameWithoutExtension(path).IndexOf("dec_") < 0)
+                {
+                    string decout = Path.Combine(Path.GetDirectoryName(path), "dec_" + Path.GetFileNameWithoutExtension(path) + ".bin");
+                    string ext = "";
+                    dsdecmp.Decompress(path, decout);
+                    using (BinaryReader dr = new BinaryReader(System.IO.File.OpenRead(decout)))
+                    {
+                        ext = Util.GuessExtension(dr, "bin");
+                    }
+                    string newname = Path.Combine(Path.GetDirectoryName(path), "dec_" + Path.GetFileNameWithoutExtension(path) + "." + ext);
+                    try
+                    {
+                        File.Delete(newname);
+                    File.Move(decout, newname);
+                    if (MessageBox.Show("Delete compressed file (Yes)?", "Alert", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                        File.Delete(path);
+                    MessageBox.Show("Decompressed file.\n\n"+Path.GetFileName(newname));
+                    return true;
+                    }
+                    catch (Exception e) {
+                        MessageBox.Show("Decompression error:\n\n" + e);
+                        return false;
+                    }
+                }
+            } catch { }
+
             try // Try packing/unpacking
             {
                 if (path.Length == 0 || path == null)
                 { throw new ArgumentException("Invalid string path"); }
                 if (Directory.Exists(path))
-                    garcPack(path, Path.Combine(Directory.GetParent(path).ToString(), Path.GetFileName(path) + ".garc"), Path.Combine(Application.StartupPath, "datapackup"), pBar1);
+                    garcPack(path, Path.Combine(Directory.GetParent(path).ToString(), Path.GetFileName(path) + ".garc"), pBar1, label);
                 else if (File.Exists(path))
-                    garcUnpack(path, path + "_", false, pBar1);
+                {
+                    // Fetch file extension (first 4 bytes) to check if it is a GARC
+                    string s;
+                    using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(path)))
+                    {
+                        try
+                        {
+                            s = new string(Util.Reverse(br.ReadChars(4)));
+                        }
+                        catch (Exception e) { MessageBox.Show("Error accessing File.\n\n" + e); return false; }
+                    }
+                    if (s != "GARC")
+                    {
+                        if ((MessageBox.Show("Input file is not a .GARC\n\nDo you want to LZ11 compress the file?", "Alert", MessageBoxButtons.YesNo)) == DialogResult.Yes)
+                        {
+                            // try compressing file
+                            int compressed = Path.GetFileNameWithoutExtension(path).IndexOf("dec_");
+                            if (compressed < 0)
+                                MessageBox.Show("Not a decompressed file. Aborting.", "Error");
+                            else
+                            {
+                                try
+                                {
+                                    string newname = Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path).Substring(compressed + 4) + ".bin");
+                                    File.Delete(newname);
+                                    dsdecmp.Compress(path, newname);
+                                    if (MessageBox.Show("Delete decompressed file (Yes)?", "Alert", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                                    {
+                                        File.Delete(path);
+                                    }
+                                    MessageBox.Show("Compressed file.\n\n" + Path.GetFileName(newname));
+                                    return true;
+                                }
+                                catch (Exception e)
+                                {
+                                    MessageBox.Show("Compression error:\n\n" + e);
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    else
+                        garcUnpack(path, path + "_", skipdecompression, pBar1, label);
+                }
                 else
                 { throw new Exception(path + " is not a folder or file"); }
 
@@ -59,17 +131,10 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 return false;
             }
         }
-        public static bool garcPack(string folderPath, string garcPath, string buildPath, ProgressBar pBar1 = null)
+        public static bool garcPack(string folderPath, string garcPath, ProgressBar pBar1 = null, Label label = null)
         {
             // Check to see if our input folder exists.
             if (!new DirectoryInfo(folderPath).Exists) { MessageBox.Show("Folder does not exist."); return false; }
-
-            // Check to see if we can make our buildpath.
-            if (!new DirectoryInfo(buildPath).Exists)
-            {
-                try { Directory.CreateDirectory(buildPath); }
-                catch { MessageBox.Show(buildPath + " is not a valid directory to work in."); return false; };
-            }
 
             // Okay some basic proofing is done. Proceed.
             
@@ -78,44 +143,25 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
             // Initialize ProgressBar
             if (pBar1 == null) pBar1 = new ProgressBar();
+            if (label == null) label = new Label();
             if (pBar1.InvokeRequired)
-                pBar1.Invoke((MethodInvoker)delegate { 
-                pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length; 
-                });
-            else
-                pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length;
+                pBar1.Invoke((MethodInvoker)delegate { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length; });
+            else                                     { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = filepaths.Length; }
+            if (label.InvokeRequired)
+                label.Invoke((MethodInvoker)delegate { label.Visible = true; });
+            else                                     { label.Visible = true; }
 
             // Copy the files to the working directory so our compression doesn't overwrite anything.
-            for (int i = 0; i < filepaths.Length; i++)
-                File.Copy(filepaths[i],Path.Combine(buildPath,Path.GetFileName(filepaths[i])),true);
+            
 
             // Scan through to see if we have to compress anything.
-            filepaths = Directory.GetFiles(buildPath, "*.*", SearchOption.TopDirectoryOnly);
-            for (int i = 0; i < filepaths.Length; i++)
+            try
             {
-                int compressed = Path.GetFileName(filepaths[i]).IndexOf("_");
-                if (compressed >= 0)
-                {
-                    // File needs to be compressed and replaced.
-                    string compressedName = Path.Combine(buildPath,Path.GetFileName(filepaths[i]).Substring(compressed+1));
-                    try
-                    {
-                        dsdecmp.Compress(filepaths[i], compressedName);
-                        try { File.Delete(filepaths[i]); } // Try to delete the decompressed file as we don't write it to the GARC.
-                        catch { MessageBox.Show("Could not delete decompressed file"); }
-                    }
-                    catch
-                    {
-                        try { File.Delete(compressedName); } // Something screwed up. This shouldn't happen unless you're fuzzing...
-                        catch { MessageBox.Show("Could not delete failed compressed file"); }
-                    }
-                }
-            }
-            // Refresh file list
-            filepaths = Directory.GetFiles(buildPath, "*.*", SearchOption.TopDirectoryOnly);
+                File.Delete(garcPath);  // Delete the old garc if it exists, then write our new one
+                File.Delete("GARCdata");
+            } catch { }
 
-            using (MemoryStream newGARC = new MemoryStream())
-            using (MemoryStream GARCdata = new MemoryStream())
+            using (var newGARC = File.Create(garcPath))
             using (BinaryWriter gw = new BinaryWriter(newGARC))
             {
 
@@ -146,59 +192,100 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
                 uint offset = 0;
                 uint largest = 0;
+
+
+                // Sort out the files to get the actual order
+                int[] fp = new int[filepaths.Length];
+                try
+                {
+                    for (int i = 0; i < fp.Length; i++)
+                    {
+                        string fn = Path.GetFileNameWithoutExtension(filepaths[i]);
+                        int compressed = fn.IndexOf("dec_");
+                        if (compressed < 0)
+                            fp[Int32.Parse(fn)] = i;
+                        else
+                            fp[Int32.Parse(fn.Substring(compressed + 4))] = i;
+                    }
+                }
+                catch { MessageBox.Show("Invalid packing filenames", "Error"); return false; }
+
+                using (var GARCdata = File.Create("GARCdata"))
                 for (int i = 0; i < filepaths.Length; i++)
                 {
-                    FileInfo fi = new FileInfo(filepaths[i]);
-                    using (FileStream fileStream = new FileStream(filepaths[i], FileMode.Open))
+                    string name = filepaths[fp[i]];
+                    try
+                    {
+                        if (label.InvokeRequired)
+                            label.Invoke((MethodInvoker)delegate { label.Text = String.Format("{0:P2} - {1}/{2} - {3}", ((float)i) / ((float)filepaths.Length), i, filepaths.Length, Path.GetFileName(name)); });
+                        else { label.Text = String.Format("{0:P2} - {1}/{2} - {3}", ((float)i) / ((float)filepaths.Length), i, filepaths.Length, Path.GetFileName(name)); }
+                    }
+                    catch { }
+                    int compressed = Path.GetFileName(name).IndexOf("dec_");
+                    if (compressed > -1)
+                    {
+                        // File needs to be compressed and replaced.
+                        string compressedName = Path.Combine(Path.GetDirectoryName(name), Path.GetFileNameWithoutExtension(name).Substring(compressed + 4) + ".bin");
+
+                        try { dsdecmp.Compress(name, compressedName); }
+                        catch { throw new Exception("Compression failed"); }
+
+                        // Replace file name with compressed name so we can delete after packing.
+                        name = compressedName;
+                    }
+                    FileInfo fi = new FileInfo(name);
+                    using (var input = File.OpenRead(name))
                     {
                         gw.Write((uint)1);          // garc.btaf.entries[i].bits = br.ReadUInt32(); 
                         gw.Write((uint)offset);     // Start/Begin Offset
                         uint round = (uint)Math.Ceiling(((double)fi.Length / 4)) * 4;
-                        offset += (uint)(round);
+                        offset += (uint)(round);    // Round up Offset.
                         gw.Write((uint)offset);     // End/Stop Offset
                         gw.Write((uint)fi.Length);  // Length/Size
 
-                        if (fi.Length > largest) largest = (uint)fi.Length;
+                        if (fi.Length > largest) largest = (uint)fi.Length; 
 
                         // Write the data to the BMIF data section
-                        fileStream.CopyTo(GARCdata);    // then pad with FF's if not /4
+                        input.CopyTo(GARCdata);    // then pad with FF's if not /4
                         while (GARCdata.Length % 4 > 0) GARCdata.WriteByte(0xFF);
                     }
+
+                    // Delete file if it is compressed.
+                    if (compressed > -1) File.Delete(name);
+
+                    // Advance the ProgressBar.
                     if (pBar1.InvokeRequired)
                         pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
-                    else
-                        pBar1.PerformStep();
+                    else                                     { pBar1.PerformStep(); }
                 }
-                // Roundup Offset
-
+                
                 gw.Write((uint)0x46494D42);
                 gw.Write((uint)0xC);
                 gw.Write((uint)offset);
 
-                uint dataOffset = (uint)newGARC.Length;
-                uint garcLength = (uint)(newGARC.Length + GARCdata.Length);
-                uint largestFile = (uint)largest;
+                using (var GARCdatainfo = new FileStream("GARCdata", FileMode.Open))
+                {
+                    uint dataOffset = (uint)newGARC.Length;
+                    uint garcLength = (uint)(newGARC.Length + GARCdatainfo.Length);
+                    uint largestFile = (uint)largest;
 
-                gw.Seek(0x10, SeekOrigin.Begin);    // Goto the start of the un-set 0 data we set earlier and set it.
-                gw.Write(dataOffset);               // Write Data Offset
-                gw.Write(garcLength);               // Write total GARC Length
-                gw.Write(largestFile);              // Write Largest File stat (?)
+                    gw.Seek(0x10, SeekOrigin.Begin);    // Goto the start of the un-set 0 data we set earlier and set it.
+                    gw.Write(dataOffset);               // Write Data Offset
+                    gw.Write(garcLength);               // Write total GARC Length
+                    gw.Write(largestFile);              // Write Largest File stat (?)
 
-                newGARC.Seek(0, SeekOrigin.End);    // Goto the end so we can copy the filedata after the GARC headers.
+                    newGARC.Seek(0, SeekOrigin.End);    // Goto the end so we can copy the filedata after the GARC headers.
 
-                // Write in the data
-                GARCdata.Seek(0, SeekOrigin.Begin); // Goto the start so we copy from the start of the filedata.
-                GARCdata.CopyTo(newGARC);           // Copy the data.
-
+                    // Write in the data
+                    GARCdatainfo.CopyTo(newGARC);           // Copy the data.
+                }
                 // New File is ready to be saved (memstream newGARC)
                 try
                 {
-                    File.Delete(garcPath);  // Delete the old garc if it exists, then write our new one
-                    using (FileStream file = new FileStream(garcPath, FileMode.Create, FileAccess.Write))
-                        newGARC.WriteTo(file);
-
-                    // Delete our working directory.
-                    Directory.Delete(buildPath, true);
+                    File.Delete("GARCdata");
+                    if (label.InvokeRequired)
+                        label.Invoke((MethodInvoker)delegate { label.Visible = false; });
+                    else { label.Visible = false; }
 
                     // We're done.
                     System.Media.SystemSounds.Exclamation.Play();
@@ -208,32 +295,25 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 catch (Exception e) { MessageBox.Show("Packing Failed!\n\n" + e); return false; }
             }
         }
-        public static bool garcUnpack(string garcPath, string outPath, bool skipDecompression, ProgressBar pBar1 = null)
+        public static bool garcUnpack(string garcPath, string outPath, bool skipDecompression, ProgressBar pBar1 = null, Label label = null)
         {
             if (!File.Exists(garcPath)) { MessageBox.Show("File does not exist"); return false; }
-
-            // Fetch file extension (first 4 bytes) to check if it is a GARC
-            using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(garcPath)))
-            {
-                try {
-                    string s = new string(Util.Reverse(br.ReadChars(4)));
-                    if (s != "GARC") { MessageBox.Show("Input file is not a .GARC"); return false; }
-                    }
-                catch (Exception) { MessageBox.Show("Invalid File."); return false; }
-            }
-
+            
             // Unpack the GARC
             GARC garc = ARC.unpackGARC(garcPath);
             
             // Initialize ProgressBar
             if (pBar1 == null) pBar1 = new ProgressBar();
+            if (label == null) label = new Label();
+
 
             if (pBar1.InvokeRequired)
-                pBar1.Invoke((MethodInvoker)delegate 
-                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
-                );
-            else
-                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
+                pBar1.Invoke((MethodInvoker)delegate { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; } );
+            else                                     { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
+
+            if (label.InvokeRequired)
+                label.Invoke((MethodInvoker)delegate { label.Visible = true; } );
+            else                                     { label.Visible = true; }
 
             using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(garcPath)))
             {
@@ -277,9 +357,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             // Write out the data for the file
                             br.BaseStream.Position = garc.btaf.entries[i].start_offset + garc.data_offset;
                             for (int x = 0; x < garc.btaf.entries[i].length; x++)
-                            {
                                 bw.Write(br.ReadByte());
-                            }
                         }
                         // See if decompression should be attempted.
                         #region Decompression
@@ -311,11 +389,17 @@ namespace GARCTool // If you are including this source file, replace the namespa
                             pBar1.Invoke((MethodInvoker)delegate { pBar1.PerformStep(); });
                         else
                             pBar1.PerformStep();
+                        if (label.InvokeRequired)
+                            label.Invoke((MethodInvoker)delegate { label.Text = String.Format("{0:P2}% - {1}/{2}", ((float)i) / ((float)garc.otaf.nFiles), i, garc.otaf.nFiles); });
+                        else { label.Text = String.Format("{0:P2}% - {1}/{2}", ((float)i) / ((float)garc.otaf.nFiles), i, garc.otaf.nFiles); }
                         #endregion
                     }
                     if (garc.otaf.nFiles == garc.btaf.nFiles) break;
                 }
             }
+            if (label.InvokeRequired)
+                label.Invoke((MethodInvoker)delegate { label.Visible = false; });
+            else { label.Visible = false; }
             System.Media.SystemSounds.Exclamation.Play();
             MessageBox.Show("Unpack Successful!\n\n" + garc.otaf.nFiles + " files unpacked from the GARC!");
             return true;

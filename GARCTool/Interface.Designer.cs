@@ -33,6 +33,7 @@
             this.TB_Path = new System.Windows.Forms.TextBox();
             this.B_OpenFile = new System.Windows.Forms.Button();
             this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.label1 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // B_OpenFolder
@@ -84,6 +85,16 @@
             this.progressBar.Size = new System.Drawing.Size(259, 13);
             this.progressBar.TabIndex = 4;
             // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(11, 79);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(21, 13);
+            this.label1.TabIndex = 5;
+            this.label1.Text = "0%";
+            this.label1.Visible = false;
+            // 
             // Interface
             // 
             this.AllowDrop = true;
@@ -95,6 +106,7 @@
             this.Controls.Add(this.TB_Path);
             this.Controls.Add(this.B_Process);
             this.Controls.Add(this.B_OpenFolder);
+            this.Controls.Add(this.label1);
             this.MaximizeBox = false;
             this.MaximumSize = new System.Drawing.Size(600, 130);
             this.MinimizeBox = false;
@@ -113,6 +125,7 @@
         private System.Windows.Forms.TextBox TB_Path;
         private System.Windows.Forms.Button B_OpenFile;
         private System.Windows.Forms.ProgressBar progressBar;
+        private System.Windows.Forms.Label label1;
     }
 }
 
