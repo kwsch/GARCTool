@@ -40,7 +40,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
         {
             try // Try decompressing the file.
             {
-                if (new FileInfo(path).Length > 60 && Path.GetExtension(path) == ".bin" && Path.GetFileNameWithoutExtension(path).IndexOf("dec_") < 0)
+                if (File.Exists(path)) if (new FileInfo(path).Length > 60 && Path.GetExtension(path) == ".bin" && Path.GetFileNameWithoutExtension(path).IndexOf("dec_") < 0)
                 {
                     string decout = Path.Combine(Path.GetDirectoryName(path), "dec_" + Path.GetFileNameWithoutExtension(path) + ".bin");
                     string ext = "";
@@ -64,7 +64,8 @@ namespace GARCTool // If you are including this source file, replace the namespa
                         return false;
                     }
                 }
-            } catch { }
+            }
+            catch (Exception e) { MessageBox.Show(e.ToString()); return false; }
 
             try // Try packing/unpacking
             {
@@ -1365,7 +1366,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
         /// <summary>
         /// Returns a 3-byte integer as used in the built-in compression
-        /// formats in the DS, convrted from three bytes at a specified position in a byte array,
+        /// formats in the DS, converted from three bytes at a specified position in a byte array,
         /// </summary>
         /// <param name="buffer">The source of the data.</param>
         /// <param name="offset">The location of the data in the source.</param>
