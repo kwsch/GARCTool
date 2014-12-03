@@ -447,7 +447,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 // check for 2char container extensions
                 try 
                 {   
-                    br.BaseStream.Position = 4 + 4 * count;
+                    br.BaseStream.Position = position + 4 + 4 * count;
                     if (br.ReadUInt32() == br.BaseStream.Length)
                     {
                         ext += (char)magic[0];
@@ -460,7 +460,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 try
                 {
                     count = BitConverter.ToUInt16(magic, 0);
-                    br.BaseStream.Position = 4 + 0x40 * count;
+                    br.BaseStream.Position = position + 4 + 0x40 * count;
                     uint tableval = br.ReadUInt32();
                     br.BaseStream.Position += 0x20 * tableval;
                     while (br.PeekChar() == 0) // seek forward
@@ -479,7 +479,8 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
                 // generic check
                 {
-                    if (magic[0] < 0x41) return defaultExt;
+                    if (magic[0] < 0x41) 
+                        return defaultExt;
                     for (int i = 0; i < magic.Length && i < 4; i++)
                     {
                         if ((magic[i] >= 'a' && magic[i] <= 'z') || (magic[i] >= 'A' && magic[i] <= 'Z')
