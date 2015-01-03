@@ -33,7 +33,7 @@
             this.TB_Path = new System.Windows.Forms.TextBox();
             this.B_OpenFile = new System.Windows.Forms.Button();
             this.progressBar = new System.Windows.Forms.ProgressBar();
-            this.label1 = new System.Windows.Forms.Label();
+            this.ProgressLabel = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // B_OpenFolder
@@ -80,20 +80,20 @@
             // 
             this.progressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar.Location = new System.Drawing.Point(12, 67);
+            this.progressBar.Location = new System.Drawing.Point(12, 66);
             this.progressBar.Name = "progressBar";
             this.progressBar.Size = new System.Drawing.Size(259, 13);
             this.progressBar.TabIndex = 4;
             // 
-            // label1
+            // ProgressLabel
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(11, 79);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(21, 13);
-            this.label1.TabIndex = 5;
-            this.label1.Text = "0%";
-            this.label1.Visible = false;
+            this.ProgressLabel.AutoSize = true;
+            this.ProgressLabel.Location = new System.Drawing.Point(11, 79);
+            this.ProgressLabel.Name = "ProgressLabel";
+            this.ProgressLabel.Size = new System.Drawing.Size(21, 13);
+            this.ProgressLabel.TabIndex = 5;
+            this.ProgressLabel.Text = "0%";
+            this.ProgressLabel.Visible = false;
             // 
             // Interface
             // 
@@ -106,7 +106,7 @@
             this.Controls.Add(this.TB_Path);
             this.Controls.Add(this.B_Process);
             this.Controls.Add(this.B_OpenFolder);
-            this.Controls.Add(this.label1);
+            this.Controls.Add(this.ProgressLabel);
             this.MaximizeBox = false;
             this.MaximumSize = new System.Drawing.Size(600, 130);
             this.MinimizeBox = false;
@@ -125,7 +125,7 @@
         private System.Windows.Forms.TextBox TB_Path;
         private System.Windows.Forms.Button B_OpenFile;
         private System.Windows.Forms.ProgressBar progressBar;
-        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Label ProgressLabel;
     }
 }
 
