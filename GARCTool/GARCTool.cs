@@ -143,6 +143,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 gw.Write((uint)0x46415442); // BTAF
                 gw.Write((uint)(0xC + 0x10 * filepaths.Length)); // Chunk Size
                 gw.Write((uint)filepaths.Length);
+                gw.Write((uint)1);          // garc.btaf.bits = br.ReadUInt32(); 
 
                 uint offset = 0;
                 uint largest = 0;
@@ -151,7 +152,6 @@ namespace GARCTool // If you are including this source file, replace the namespa
                     FileInfo fi = new FileInfo(filepaths[i]);
                     using (FileStream fileStream = new FileStream(filepaths[i], FileMode.Open))
                     {
-                        gw.Write((uint)1);          // garc.btaf.entries[i].bits = br.ReadUInt32(); 
                         gw.Write((uint)offset);     // Start/Begin Offset
                         uint round = (uint)Math.Ceiling(((double)fi.Length / 4)) * 4;
                         offset += (uint)(round);
@@ -247,7 +247,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 }
             
                 // Pull out all the files
-                for (int i = 0; i < garc.otaf.nFiles; i++)
+                for (int i = 0; i < garc.btaf.nFiles; i++)
                 {
                     string ext = "bin";
                     bool compressed = false;
@@ -429,11 +429,11 @@ namespace GARCTool // If you are including this source file, replace the namespa
             garc.btaf.id = br.ReadChars(4);
             garc.btaf.section_size = br.ReadUInt32();
             garc.btaf.nFiles = br.ReadUInt32();
+            garc.btaf.bits = br.ReadUInt32();
 
             garc.btaf.entries = new BTAF_Entry[garc.btaf.nFiles];
             for (int i = 0; i < garc.btaf.nFiles; i++)
             {
-                garc.btaf.entries[i].bits = br.ReadUInt32();
                 garc.btaf.entries[i].start_offset = br.ReadUInt32();
                 garc.btaf.entries[i].end_offset = br.ReadUInt32();
                 garc.btaf.entries[i].length = br.ReadUInt32();
@@ -485,10 +485,10 @@ namespace GARCTool // If you are including this source file, replace the namespa
         public UInt32 section_size;
         public UInt32 nFiles;
         public BTAF_Entry[] entries;
+        public UInt32 bits;
     }
     public struct BTAF_Entry
     {
-        public UInt32 bits;
         public UInt32 start_offset;
         public UInt32 end_offset;
         public UInt32 length;
