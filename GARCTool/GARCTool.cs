@@ -233,10 +233,10 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
             if (pBar1.InvokeRequired)
                 pBar1.Invoke((MethodInvoker)delegate 
-                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
+                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = (int)garc.btaf.nFiles; }
                 );
             else
-                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = garc.otaf.nFiles; }
+                { pBar1.Minimum = 0; pBar1.Step = 1; pBar1.Value = 0; pBar1.Maximum = (int)garc.btaf.nFiles; }
 
             using (BinaryReader br = new BinaryReader(System.IO.File.OpenRead(garcPath)))
             {
@@ -247,7 +247,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 }
             
                 // Pull out all the files
-                for (int i = 0; i < garc.otaf.nFiles; i++)
+                for (int i = 0; i < garc.btaf.nFiles; i++)
                 {
                     string ext = "bin";
                     bool compressed = false;
@@ -268,7 +268,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                     catch { ext = null; }
 
                     // Set File Name
-                    string filename = i.ToString("D" + Math.Ceiling(Math.Log10(garc.otaf.nFiles)));
+                    string filename = i.ToString("D" + Math.Ceiling(Math.Log10(garc.btaf.nFiles)));
                     string fileout = Path.Combine(outPath,filename + "." + ext);
                     using (BinaryWriter bw = new BinaryWriter(File.OpenWrite(fileout)))
                     {
@@ -313,7 +313,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
                 }
             }
             System.Media.SystemSounds.Exclamation.Play();
-            MessageBox.Show("Unpack Successful!\n\n" + garc.otaf.nFiles + " files unpacked from the GARC!");
+            MessageBox.Show("Unpack Successful!\n\n" + garc.btaf.nFiles + " files unpacked from the GARC!");
             return true;
         }
     }
@@ -434,15 +434,17 @@ namespace GARCTool // If you are including this source file, replace the namespa
             for (int i = 0; i < garc.btaf.nFiles; i++)
             {
                 garc.btaf.entries[i].bits = br.ReadUInt32();
+                if (garc.btaf.entries[i].bits != 1 & garc.btaf.entries[i].bits != 257 & garc.btaf.entries[i].bits != 445 & garc.btaf.entries[i].bits != 447)
+                    br.BaseStream.Position -= 4;
                 garc.btaf.entries[i].start_offset = br.ReadUInt32();
                 garc.btaf.entries[i].end_offset = br.ReadUInt32();
                 garc.btaf.entries[i].length = br.ReadUInt32();
             }
 
             // BMIF
-            garc.gmif.id = br.ReadChars(4);
-            garc.gmif.section_size = br.ReadUInt32();
-            garc.gmif.data_size = br.ReadUInt32();
+            garc.bmif.id = br.ReadChars(4);
+            garc.bmif.section_size = br.ReadUInt32();
+            garc.bmif.data_size = br.ReadUInt32();
 
             // Files data
 
@@ -464,7 +466,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
 
         public OTAF otaf;
         public BTAF btaf;
-        public GMIF gmif;
+        public BMIF bmif;
     }
     public struct OTAF
     {
@@ -493,7 +495,7 @@ namespace GARCTool // If you are including this source file, replace the namespa
         public UInt32 end_offset;
         public UInt32 length;
     }
-    public struct GMIF
+    public struct BMIF
     {
         public char[] id;
         public UInt32 section_size;
